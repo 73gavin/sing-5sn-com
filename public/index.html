@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Range Test</title>
+  <meta name="description" content="Free, open source vocal range test. Find your lowest, highest, and comfortable notes in your browser.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Voice Range Test</h1>
+    <p class="tagline">Find the notes your voice can reach, and the ones it enjoys.</p>
+  </header>
+
+  <main>
+    <section id="intro" class="card">
+      <p>This test takes about 3 minutes. The app plays a note, you sing it back, and you
+        say how it felt. Step by step it finds your <b>lowest</b> and <b>highest</b> notes and,
+        more usefully, your <b>comfortable range</b>: the notes a song should stay inside.</p>
+      <ul>
+        <li><b>Use headphones</b> if you can, so the mic hears you and not the reference tone.</li>
+        <li>A quiet room helps. Sing on an open "ahh" at a normal speaking volume.</li>
+        <li>Don't push. If a note hurts, scratches, or cracks, mark it and stop.</li>
+        <li>Your audio never leaves this device. Nothing is recorded or uploaded.</li>
+      </ul>
+      <button id="start" class="primary">Start (allow microphone)</button>
+      <p id="mic-error" class="error" hidden></p>
+    </section>
+
+    <section id="live" class="card" hidden>
+      <div class="readout">
+        <div>
+          <div id="note" class="note">-</div>
+          <div id="hz" class="hz">listening...</div>
+          <div id="live-target" class="live-target"></div>
+        </div>
+        <div class="meters">
+          <label>Tuning <span class="hint">(flat / sharp)</span></label>
+          <div class="cents"><div class="cents-center"></div><div id="cents-needle" class="cents-needle"></div></div>
+          <label>Input level <span id="clip" class="warn" hidden>too loud, back off the mic</span></label>
+          <div class="level"><div id="level-bar" class="level-bar"></div></div>
+        </div>
+      </div>
+      <p id="step-hint" class="warn step-hint"></p>
+      <canvas id="trace" aria-label="Pitch over the last few seconds"></canvas>
+      <p class="extremes">Lowest note held: <b id="free-low">-</b> | Highest note held: <b id="free-high">-</b></p>
+    </section>
+
+    <section id="step" class="card" hidden>
+      <h2 id="step-title"></h2>
+      <div id="step-body"></div>
+      <div id="actions" class="actions"></div>
+    </section>
+
+    <section id="results" class="card" hidden>
+      <h2>Your range</h2>
+      <div id="summary"></div>
+      <div id="keyboard" class="keyboard" aria-label="Keyboard showing your range"></div>
+      <div class="legend">
+        <span><i class="sw comfy"></i>Comfortable</span>
+        <span><i class="sw reach"></i>Reachable, strained</span>
+        <span><i class="sw light"></i>Light voice (falsetto)</span>
+        <span><i class="sw home"></i>Starting note</span>
+      </div>
+      <div class="actions">
+        <button id="copy-ai" class="primary">Copy for any AI app</button>
+        <button id="share-ai" hidden>Share to an app</button>
+      </div>
+      <p class="hint">Copies your results with a ready-made question. Paste it into ChatGPT, Gemini, Claude,
+        or any AI chat to get an explanation, songs to try, and practice tips.</p>
+      <div class="actions">
+        <button id="hear">Hear my comfortable range</button>
+        <button id="export">Download results (JSON)</button>
+        <button id="retest">Test again</button>
+        <button id="ask-ai" hidden>Ask AI to explain my results</button>
+      </div>
+      <div id="ai-output" class="ai-output" hidden></div>
+    </section>
+
+    <section id="history" class="card" hidden>
+      <h2>Previous tests</h2>
+      <p class="hint">Saved in this browser only. Voices vary day to day; warmed up in the evening is usually wider than first thing in the morning.</p>
+      <ul id="history-list"></ul>
+      <div class="actions"><button id="copy-all">Copy all tests for AI (compare them)</button></div>
+    </section>
+
+    <details class="card glossary">
+      <summary>New to music? How note names work</summary>
+      <p>Notes are named with letters <b>C D E F G A B</b>, plus "sharps" (<b>C#</b> = a half step above C)
+        for the black piano keys. After B the letters start over, one <b>octave</b> higher. An octave is a doubling
+        of frequency: A3 is 220 Hz, A4 is 440 Hz.</p>
+      <p>The number is the octave. <b>C4</b> is "middle C" (261.6 Hz), the middle of a piano. Most adult men speak
+        around 85-155 Hz (roughly E2-D#3), most women around 165-255 Hz (E3-B3).</p>
+      <p>A <b>semitone</b> (half step) is one piano key, black or white: a frequency ratio of about 1.059.
+        12 semitones make an octave. A typical pop melody spans 12-18 semitones.</p>
+      <p><b>Comfortable range</b> (singers call it tessitura) matters more than extremes. A song in the wrong
+        key for you is the most common reason a song feels "unsingable". Any song can be moved (transposed)
+        to fit your range.</p>
+    </details>
+  </main>
+
+  <footer>
+    <p>Free and open source (<a href="https://github.com/73gavin/sing-5sn-com/blob/main/LICENSE">AGPL-3.0</a>).
+      <a href="https://github.com/73gavin/sing-5sn-com">Source code</a>. Pitch detection runs on your device using the YIN algorithm.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

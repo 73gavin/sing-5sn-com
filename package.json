@@ -1,0 +1,19 @@
+{
+  "name": "voice-range",
+  "version": "0.1.0",
+  "description": "Open source vocal range test and songwriting aid for beginner singers",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node bridge/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "lan": "node bridge/server.mjs --lan"
+  },
+  "author": "Gavin Hollinger",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/73gavin/sing-5sn-com"
+  },
+  "homepage": "https://sing.5sn.com"
+}
