@@ -24,7 +24,13 @@
         <li>Don't push. If a note hurts, scratches, or cracks, mark it and stop.</li>
         <li>Your audio never leaves this device. Nothing is recorded or uploaded.</li>
       </ul>
-      <button id="start" class="primary">Start (allow microphone)</button>
+      <label class="hint check"><input type="checkbox" class="bright-lows" checked> Brighter low notes: adds
+        harmonics up to about 1 kHz to notes below E3 (165 Hz), so laptop and phone speakers, which
+        play little below 200-300 Hz, can make them heard. Turn off for headphones or full-range speakers.</label>
+      <div class="actions">
+        <button id="start" class="primary">Start (allow microphone)</button>
+        <button class="practice-open">Practice matching notes</button>
+      </div>
       <p id="mic-error" class="error" hidden></p>
     </section>
 
@@ -43,6 +49,7 @@
         </div>
       </div>
       <p id="step-hint" class="warn step-hint"></p>
+      <p id="input-stats" class="input-stats" hidden></p>
       <canvas id="trace" aria-label="Pitch over the last few seconds"></canvas>
       <p class="extremes">Lowest note held: <b id="free-low">-</b> | Highest note held: <b id="free-high">-</b></p>
     </section>
@@ -51,6 +58,30 @@
       <h2 id="step-title"></h2>
       <div id="step-body"></div>
       <div id="actions" class="actions"></div>
+    </section>
+
+    <section id="practice" class="card" hidden>
+      <h2>Practice: match the note</h2>
+      <p>Hold a key (click, touch, or type the letter shown) to hear a note. It plays for as long as
+        you hold it. Then sing it back on an "ahh" and hold it steady. The needle shows how far
+        flat or sharp you are in cents: 100 cents is one semitone (one piano key, about 5.9% in
+        frequency), and under 10 cents (0.6%) is dead on.</p>
+      <p id="practice-range" class="hint"></p>
+      <div id="practice-keys" class="keyboard practice-keys" aria-label="Playable keyboard"></div>
+      <p id="practice-result" class="practice-result"></p>
+      <div class="actions">
+        <button id="oct-down">Octave down<kbd>Z</kbd></button>
+        <button id="oct-up">Octave up<kbd>X</kbd></button>
+        <button id="practice-done">Done</button>
+      </div>
+      <label class="hint check"><input type="checkbox" id="headphones"> Headphones on: keep
+        listening while the note plays, so you can sing along</label>
+      <label class="hint check"><input type="checkbox" class="bright-lows" checked> Brighter low notes: adds
+        harmonics up to about 1 kHz to notes below E3 (165 Hz), so laptop and phone speakers, which
+        play little below 200-300 Hz, can make them heard. Turn off for headphones or full-range speakers.</label>
+      <p class="hint">Testing a phone, laptop, or mic: open this page on two devices, hold notes on
+        one, and watch the other. A steady tone should read the right Hz with clarity near 1.00.
+        Small speakers can't play the lowest notes, but their harmonics still carry the pitch.</p>
     </section>
 
     <section id="results" class="card" hidden>
@@ -73,6 +104,7 @@
         <button id="hear">Hear my comfortable range</button>
         <button id="export">Download results (JSON)</button>
         <button id="retest">Test again</button>
+        <button class="practice-open">Practice matching notes</button>
         <button id="ask-ai" hidden>Ask AI to explain my results</button>
       </div>
       <div id="ai-output" class="ai-output" hidden></div>

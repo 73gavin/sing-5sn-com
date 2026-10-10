@@ -119,6 +119,17 @@ button kbd { opacity: 0.6; font-size: 0.8em; margin-left: 6px; }
   background: var(--home);
 }
 .key.black.is-home::after { bottom: 8px; }
+
+/* Practice keyboard: playable, labeled with the computer key that plays each note. */
+.practice-keys { height: 150px; touch-action: none; }
+.practice-keys .key { cursor: pointer; }
+.practice-keys .key .label { font-size: 0.75rem; line-height: 1.3; }
+.practice-keys .key.black .label { color: #ddd; }
+.practice-keys .key.down { background: var(--accent); }
+.practice-keys .key.out { opacity: 0.35; cursor: not-allowed; }
+.practice-result { min-height: 1.5em; font-size: 1.1rem; }
+.input-stats { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.check { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .sw.comfy { background: var(--comfy); }
@@ -141,7 +152,8 @@ button kbd { opacity: 0.6; font-size: 0.8em; margin-left: 6px; }
 /* During the test: readout and graph pinned to the top, buttons pinned to the bottom,
    instructions scroll in between. */
 body.testing { padding-bottom: 150px; }
-body.testing #live {
+body.testing #live,
+body.practicing #live {
   position: sticky;
   top: 0;
   z-index: 5;

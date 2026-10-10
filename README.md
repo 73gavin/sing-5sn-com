@@ -68,6 +68,20 @@ that, two strained notes ask "Keep going / Finish" and "Can't reach" finishes. T
 The mic is ignored while a reference tone plays, so it works without headphones, but
 headphones are better.
 
+Practice mode: hold a key (on screen, or the home row `A`-`;` and `W E T Y U O P` above it,
+DAW "musical typing" style) and the note plays until you let go. Sing it back within 50 cents
+for 0.8 s to score a match, reported in cents flat or sharp. `Z` / `X` shift the octave; it
+starts on the C below your last comfortable range. A "Headphones on" box keeps the mic
+listening while the note plays. An input line shows level in dBFS against the -40 dBFS gate
+and detector clarity, so two devices can test each other: hold notes on one, watch the other.
+
+"Brighter low notes" (on by default, saved in the browser) gives reference tones below E3
+(165 Hz) harmonics up to about 1 kHz (`toneHarmonics` in `audio.js`), with Schroeder phases
+so the peak-normalized wave stays loud. Laptop and phone speakers play little below
+200-300 Hz; on a laptop's own speaker-to-mic path this raised A1 (55 Hz) from -48 to
+-28 dBFS and took detection from 0 to 16 of 16 frames. Turn it off for headphones or
+full-range speakers if you prefer the plain tone.
+
 Results export as JSON (`schema: voice-range/v1`). Later phases consume this file.
 
 ## AI (optional, pluggable)

@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDetector, NoteHold } from '../public/js/pitch.js';
 import { midiToFreq, midiToName, nearestNote, guessVoiceType } from '../public/js/notes.js';
+import { toneHarmonics } from '../public/js/audio.js';
 
 const SR = 48000;
 const N = 4096;
@@ -27,11 +28,33 @@ test('note names', () => {
 });
 
 test('detects pitch across the vocal range within 10 cents', () => {
-  const detect = createDetector({ sampleRate: SR });
   // From E1 (41 Hz), the bottom of the guided test, up.
+  const detect = createDetector({ sampleRate: SR });
   for (let midi = 28; midi <= 90; midi++) {
     const hz = midiToFreq(midi);
     const r = detect(tone(hz, { noise: 0.02 }));
+    assert.ok(r.hz, `no pitch for ${midiToName(midi)}`);
+    const cents = 1200 * Math.log2(r.hz / hz);
+    assert.ok(Math.abs(cents) < 10, `${midiToName(midi)}: off by ${cents.toFixed(1)} cents`);
+  }
+});
+
+// What a small speaker leaves of a bright reference tone: nothing below 250 Hz.
+test('bright low tones keep their pitch with the fundamental removed', () => {
+  const detect = createDetector({ sampleRate: SR });
+  for (let midi = 28; midi <= 52; midi++) { // E1 (41 Hz) to E3 (165 Hz)
+    const hz = midiToFreq(midi);
+    const { real, imag } = toneHarmonics(hz, true);
+    const buf = new Float32Array(N);
+    let audible = 0;
+    for (let h = 1; h < real.length; h++) {
+      if (h * hz < 250) continue;
+      audible++;
+      const w = (2 * Math.PI * hz * h) / SR;
+      for (let i = 0; i < N; i++) buf[i] += 0.1 * (real[h] * Math.cos(w * i) + imag[h] * Math.sin(w * i));
+    }
+    assert.ok(audible >= 3, `${midiToName(midi)}: only ${audible} harmonics above 250 Hz`);
+    const r = detect(buf);
     assert.ok(r.hz, `no pitch for ${midiToName(midi)}`);
     const cents = 1200 * Math.log2(r.hz / hz);
     assert.ok(Math.abs(cents) < 10, `${midiToName(midi)}: off by ${cents.toFixed(1)} cents`);

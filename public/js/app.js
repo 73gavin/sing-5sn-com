@@ -1,6 +1,6 @@
 import { createDetector, NoteHold, PitchSmoother, speakingPitch } from './pitch.js';
 import { noteInfo, midiToName, midiToFreq, freqToMidi, isBlackKey, guessVoiceType } from './notes.js';
-import { openMic, playTone } from './audio.js';
+import { openMic, playTone, holdTone } from './audio.js';
 import { aiStatus, aiAsk } from './ai.js';
 import { accuracyOf, aiPrompt } from './report.js';
 
@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const label = (midi) => `${midiToName(midi)} <small>${midiToFreq(midi).toFixed(1)} Hz</small>`;
 const STORE = 'voiceRange.tests';
+const BRIGHT = 'voiceRange.brightLows'; // '0' = plain reference tones
 const HOLD_MS = 800;     // how long a matched note must be held
 const MATCH = 0.5;       // semitones: within 50 cents counts as the note
 const LISTEN_MS = 9000;  // give up waiting for a note after this
@@ -24,6 +25,7 @@ let speech = null;  // voiced frames (MIDI) collected while the person talks
 let current = null; // result on screen
 let running = false;
 let liveTarget = null; // note being tested, shown in the pinned readout and on the graph
+let brightLows = localStorage.getItem(BRIGHT) !== '0'; // extra harmonics on low tones, on by default
 
 // ---------- live input ----------
 
@@ -44,6 +46,7 @@ function tick(now) {
 
   const smooth = smoother.feed(hz, now);
   showLevel(r.rms, peak, now);
+  if (practicing) showStats(r, now);
   showPitch(smooth);
   // Graph the steadied pitch, but leave real gaps (breaths) as gaps.
   trace.push({ t: now, midi: hz ? smooth : null });
@@ -84,6 +87,19 @@ function offTargetHint(sung, target) {
     return `You're singing ${midiToName(Math.round(sung))}, one octave ${dir} than the tone. It sounds like the "same" note, which is why it's easy to do. Try to match the tone's actual height.`;
   }
   return `You're on ${midiToName(Math.round(sung))}, ${steps} steps ${dir} than ${midiToName(target)}. Slide ${diff > 0 ? 'down' : 'up'} toward the tone.`;
+}
+
+// For checking a device: level against the detector's gate (rms 0.01 = -40 dBFS), and
+// clarity (1 = perfectly periodic, the detector needs 0.85). Updated about 4 times a second.
+let statsAt = 0;
+function showStats(r, now) {
+  if (now - statsAt < 250) return;
+  statsAt = now;
+  const db = 20 * Math.log10(r.rms || 1e-6);
+  const pitch = r.hz ? `${r.hz.toFixed(1)} Hz, clarity ${r.clarity.toFixed(2)}` : 'no steady pitch';
+  const gate = r.rms < 0.01 ? ' (below the -40 dBFS gate)' : '';
+  const paused = now < muteUntil ? ' | matching paused while the note plays' : '';
+  $('input-stats').textContent = `Input ${db.toFixed(0)} dBFS${gate} | ${pitch}${paused}`;
 }
 
 // VU-style ballistics: instant rise, fall at about 20 dB per second.
@@ -247,7 +263,7 @@ function ask({ hold, choices = [], timeoutMs, until }) {
 
 async function reference(midi, seconds = 1.0) {
   muteUntil = performance.now() + seconds * 1000 + 300;
-  await playTone(mic.ctx, midiToFreq(midi), seconds);
+  await playTone(mic.ctx, midiToFreq(midi), seconds, brightLows);
   await sleep(300);
   guideHold.reset();
 }
@@ -552,25 +568,32 @@ function drawKeyboard(r) {
   hi += 11 - (((hi % 12) + 12) % 12); // end on a B
   while (hi - lo + 1 < 36) hi += 12;
 
-  const kb = $('keyboard');
-  kb.replaceChildren();
-  const whites = [];
-  for (let m = lo; m <= hi; m++) if (!isBlackKey(m)) whites.push(m);
-  const ww = 100 / whites.length;
+  renderKeys($('keyboard'), lo, hi, (key, m, black) => {
+    if (cls[rated.get(m)]) key.classList.add(cls[rated.get(m)]);
+    if (m === r.home.midi) key.classList.add('is-home');
+    key.title = `${midiToName(m)} ${midiToFreq(m).toFixed(1)} Hz${rated.has(m) ? ' - ' + rated.get(m) : ''}`;
+    if (!black && m % 12 === 0) key.innerHTML = `<span class="label">${midiToName(m)}</span>`;
+  });
+}
 
+// Piano keys lo..hi into kb; decorate(key, midi, black) adds classes, titles, and labels.
+function renderKeys(kb, lo, hi, decorate) {
+  kb.replaceChildren();
+  let whites = 0;
+  for (let m = lo; m <= hi; m++) if (!isBlackKey(m)) whites++;
+  const ww = 100 / whites;
   let wi = 0;
   for (let m = lo; m <= hi; m++) {
     const key = document.createElement('div');
     const black = isBlackKey(m);
-    key.className = `key ${black ? 'black' : 'white'} ${cls[rated.get(m)] || ''} ${m === r.home.midi ? 'is-home' : ''}`;
-    key.title = `${midiToName(m)} ${midiToFreq(m).toFixed(1)} Hz${rated.has(m) ? ' - ' + rated.get(m) : ''}`;
+    key.className = `key ${black ? 'black' : 'white'}`;
     if (black) {
       key.style.left = `${wi * ww - ww * 0.3}%`;
       key.style.width = `${ww * 0.6}%`;
     } else {
-      if (m % 12 === 0) key.innerHTML = `<span class="label">${midiToName(m)}</span>`;
       wi++;
     }
+    decorate(key, m, black);
     kb.append(key);
   }
 }
@@ -581,7 +604,7 @@ async function hearRange() {
   const ctx = mic?.ctx || (playCtx ||= new AudioContext());
   const seq = [r.comfortable.low.midi, r.home.midi, r.comfortable.high.midi];
   muteUntil = performance.now() + seq.length * 900 + 300;
-  for (const m of seq) await playTone(ctx, midiToFreq(m), 0.8);
+  for (const m of seq) await playTone(ctx, midiToFreq(m), 0.8, brightLows);
 }
 
 // Copy or share a ready-made prompt so results work with any AI app the person already uses.
@@ -624,6 +647,127 @@ function exportResult() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ---------- practice: hold a key to hear a note, then sing it back ----------
+
+// Computer keys laid out like a piano, as in a DAW's "musical typing": the home row plays the
+// white keys and the row above plays the black keys. Index = semitones above the C.
+const TYPING = 'awsedftgyhujkolp;';
+const LOWEST = 28; // E1 (41.2 Hz); the detector stops at 40 Hz
+let practicing = false;
+let practiceBase = 48; // C3 (130.8 Hz) until a saved test says otherwise
+let sounding = null;   // { midi, release } for the key being held
+const tally = { matched: 0, cents: 0 };
+
+async function startPractice() {
+  if (running || !(await openInput())) return;
+  if (!practicing) {
+    // Start on the C at or below the most recent comfortable range (or starting note).
+    const last = current || loadAll()[0];
+    const from = last?.comfortable?.low.midi ?? last?.home?.midi;
+    if (from != null) practiceBase = Math.max(24, Math.min(72, from - (((from % 12) + 12) % 12)));
+    Object.assign(tally, { matched: 0, cents: 0 });
+    $('practice-result').textContent = '';
+    document.addEventListener('keydown', onPracticeKey);
+    document.addEventListener('keyup', onPracticeKey);
+  }
+  practicing = true;
+  document.body.classList.add('practicing');
+  for (const id of ['intro', 'results', 'step']) $(id).hidden = true;
+  $('practice').hidden = false;
+  $('input-stats').hidden = false;
+  drawPracticeKeys();
+  $('live').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function stopPractice() {
+  if (!practicing) return;
+  releaseKey();
+  practicing = false;
+  pending = null;
+  setTarget(null);
+  hint(null);
+  document.removeEventListener('keydown', onPracticeKey);
+  document.removeEventListener('keyup', onPracticeKey);
+  document.body.classList.remove('practicing');
+  $('practice').hidden = true;
+  $('input-stats').hidden = true;
+}
+
+function drawPracticeKeys() {
+  const hi = practiceBase + TYPING.length - 1;
+  renderKeys($('practice-keys'), practiceBase, hi, (key, m, black) => {
+    const typed = TYPING[m - practiceBase].toUpperCase();
+    key.dataset.midi = m;
+    key.title = `${midiToName(m)} ${midiToFreq(m).toFixed(1)} Hz (key ${typed})`;
+    key.innerHTML = `<span class="label">${typed}${black ? '' : '<br>' + midiToName(m)}</span>`;
+    if (m < LOWEST) key.classList.add('out');
+  });
+  const hz = (m) => midiToFreq(m).toFixed(1);
+  $('practice-range').textContent = `Keys play ${midiToName(practiceBase)} (${hz(practiceBase)} Hz) to ${midiToName(hi)} (${hz(hi)} Hz).`;
+}
+
+function shiftOctave(semitones) {
+  releaseKey();
+  practiceBase = Math.max(24, Math.min(72, practiceBase + semitones));
+  drawPracticeKeys();
+}
+
+function pressKey(midi) {
+  if (midi < LOWEST || sounding?.midi === midi) return;
+  releaseKey();
+  sounding = { midi, release: holdTone(mic.ctx, midiToFreq(midi), brightLows) };
+  $('practice-keys').querySelector(`[data-midi="${midi}"]`)?.classList.add('down');
+  if (!$('headphones').checked) muteUntil = Infinity;
+  setTarget(midi);
+  $('practice-result').textContent = '';
+  guideHold.reset();
+  pending = { minMs: HOLD_MS, target: midi, accept: (gh) => Math.abs(gh.exact - midi) <= MATCH, done: matched };
+}
+
+function releaseKey() {
+  if (!sounding) return;
+  sounding.release();
+  $('practice-keys').querySelector(`[data-midi="${sounding.midi}"]`)?.classList.remove('down');
+  sounding = null;
+  if (muteUntil === Infinity) muteUntil = performance.now() + 450; // release ramp and room tail
+}
+
+function matched({ hold }) {
+  const target = pending.target;
+  pending = null; // one match per key press; press again to retry
+  hint(null);
+  const cents = Math.round((hold.exact - target) * 100);
+  tally.matched++;
+  tally.cents += Math.abs(cents);
+  const how = Math.abs(cents) < 10 ? 'dead on' : `${Math.abs(cents)} cents ${cents > 0 ? 'sharp (high)' : 'flat (low)'}`;
+  $('practice-result').innerHTML = `Matched ${label(target)}: ${how}. <span class="hint">${tally.matched} matched so far, average ${Math.round(tally.cents / tally.matched)} cents off.</span>`;
+}
+
+function onPracticeKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  const i = TYPING.indexOf(k);
+  if (e.type === 'keyup') {
+    if (i >= 0 && sounding?.midi === practiceBase + i) releaseKey();
+    return;
+  }
+  if (k === 'z' || k === 'x') {
+    e.preventDefault();
+    if (!e.repeat) shiftOctave(k === 'z' ? -12 : 12);
+  } else if (i >= 0) {
+    e.preventDefault();
+    if (!e.repeat) pressKey(practiceBase + i);
+  }
+}
+
+$('practice-keys').addEventListener('pointerdown', (e) => {
+  const key = e.target.closest('.key');
+  if (!key) return;
+  e.preventDefault();
+  pressKey(Number(key.dataset.midi));
+});
+for (const ev of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(ev, () => releaseKey());
 
 // ---------- history ----------
 
@@ -704,7 +848,8 @@ async function askAi() {
 
 // ---------- start ----------
 
-async function start() {
+async function openInput() {
+  if (mic) return true;
   try {
     mic = await openMic();
   } catch (e) {
@@ -713,17 +858,41 @@ async function start() {
     err.textContent = e.name === 'NotAllowedError'
       ? 'Microphone access was blocked. Allow it from the icon in the address bar, then try again.'
       : `Could not open the microphone: ${e.message}`;
-    return;
+    return false;
   }
   detect = createDetector({ sampleRate: mic.sampleRate });
-  $('intro').hidden = true;
   $('live').hidden = false;
   requestAnimationFrame(tick);
+  return true;
+}
+
+async function start() {
+  if (running || !(await openInput())) return;
+  stopPractice();
+  $('intro').hidden = true;
   runTest();
 }
 
 $('start').onclick = start;
-$('retest').onclick = () => (mic ? runTest() : start());
+$('retest').onclick = start;
+for (const b of document.querySelectorAll('.practice-open')) b.onclick = startPractice;
+// The same setting appears on the intro and practice cards; keep both boxes in step.
+const brightBoxes = document.querySelectorAll('.bright-lows');
+for (const box of brightBoxes) {
+  box.checked = brightLows;
+  box.onchange = () => {
+    brightLows = box.checked;
+    localStorage.setItem(BRIGHT, brightLows ? '1' : '0');
+    for (const other of brightBoxes) other.checked = brightLows;
+  };
+}
+$('oct-down').onclick = () => shiftOctave(-12);
+$('oct-up').onclick = () => shiftOctave(12);
+$('practice-done').onclick = () => {
+  stopPractice();
+  if (current) $('results').hidden = false;
+  else $('intro').hidden = false;
+};
 $('hear').onclick = hearRange;
 $('export').onclick = exportResult;
 $('ask-ai').onclick = askAi;
