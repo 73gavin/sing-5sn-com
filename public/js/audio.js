@@ -7,7 +7,7 @@ export async function openMic() {
   });
   const ctx = new AudioContext();
   const analyser = ctx.createAnalyser();
-  analyser.fftSize = 4096; // ~85 ms at 48 kHz: two periods of the lowest note we track
+  analyser.fftSize = 4096; // ~85 ms at 48 kHz: room for 1.7 periods of 40 Hz (E1) beyond the YIN window
   ctx.createMediaStreamSource(stream).connect(analyser);
   const buf = new Float32Array(analyser.fftSize);
 

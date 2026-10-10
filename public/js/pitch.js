@@ -4,7 +4,7 @@
 
 import { freqToMidi } from './notes.js';
 
-export function createDetector({ sampleRate, minFreq = 55, maxFreq = 1600, threshold = 0.15, minRms = 0.01 }) {
+export function createDetector({ sampleRate, minFreq = 40, maxFreq = 1600, threshold = 0.15, minRms = 0.01 }) {
   let d = new Float32Array(0);
 
   return function detect(buf) {

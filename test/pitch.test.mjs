@@ -28,7 +28,8 @@ test('note names', () => {
 
 test('detects pitch across the vocal range within 10 cents', () => {
   const detect = createDetector({ sampleRate: SR });
-  for (let midi = 36; midi <= 90; midi++) {
+  // From E1 (41 Hz), the bottom of the guided test, up.
+  for (let midi = 28; midi <= 90; midi++) {
     const hz = midiToFreq(midi);
     const r = detect(tone(hz, { noise: 0.02 }));
     assert.ok(r.hz, `no pitch for ${midiToName(midi)}`);
