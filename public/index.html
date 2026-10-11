@@ -30,6 +30,7 @@
       <div class="actions">
         <button id="start" class="primary">Start (allow microphone)</button>
         <button class="practice-open">Practice matching notes</button>
+        <button class="song-open">Practice a song</button>
       </div>
       <p id="mic-error" class="error" hidden></p>
     </section>
@@ -84,6 +85,198 @@
         Small speakers can't play the lowest notes, but their harmonics still carry the pitch.</p>
     </section>
 
+    <section id="song" class="card" hidden>
+      <h2>Practice a song</h2>
+      <p>Pick a song and press <b>Sing it</b>. After a few clicks to count you in, the notes scroll
+        toward the blue line. Each bar is a note: higher bars are higher notes, longer bars are held
+        longer. Sing each note as it crosses the line, and your voice draws over it.</p>
+      <div class="song-row">
+        <label>Song <select id="song-select"></select></label>
+        <label id="song-voice-label" hidden>My part <select id="song-voice"></select></label>
+        <label id="song-verse-label" hidden>Words <select id="song-verse"></select></label>
+      </div>
+      <p id="song-info" class="hint"></p>
+
+      <details id="library" class="song-own">
+        <summary>Library: songbooks, your songs, and choir sets</summary>
+        <p id="lib-empty" class="hint">Nothing here yet. Open a library or set file below, or collect songbooks
+          from churchofjesuschrist.org. Songs you send with the Send to Sing bookmark are kept here too.</p>
+        <div class="song-row">
+          <input id="lib-search" type="search" placeholder="Search: number, title, words, topic, author" aria-label="Search the library">
+          <select id="lib-coll" aria-label="Collection"></select>
+          <select id="lib-topic" aria-label="Topic" hidden></select>
+          <select id="lib-facet" aria-label="Voicing, difficulty, and more" hidden></select>
+          <select id="lib-pop" aria-label="How often it's sung">
+            <option value="">All songs</option>
+            <option value="10">Most sung: top 10</option>
+            <option value="25">Most sung: top 25</option>
+            <option value="50">Most sung: top 50</option>
+          </select>
+          <label>Fit for <select id="lib-fit">
+            <option value="part">my part (with a choir)</option>
+            <option value="melody">the melody (on my own)</option>
+          </select></label>
+          <button id="lib-delete" hidden>Remove this collection</button>
+        </div>
+        <p id="lib-coll-note" class="hint"></p>
+        <p id="lib-count" class="hint"></p>
+        <ul id="lib-results" class="lib-results"></ul>
+
+        <div id="set-box" class="set-box" hidden>
+          <h3>Choir set</h3>
+          <div class="song-row"><label>Name <input id="set-name"></label></div>
+          <textarea id="set-note" rows="2" placeholder="A note for everyone (optional)"></textarea>
+          <ol id="set-list" class="set-list"></ol>
+          <div class="actions"><button id="set-save" class="primary">Save the set to a file</button><button id="set-clear">Clear the set</button></div>
+          <p class="hint">Email or text the file, or put it on Dropbox or a website and share the link. Members open it below.</p>
+        </div>
+
+        <h3>Open or save</h3>
+        <div class="song-row"><label>Open a file <input type="file" id="lib-file" accept=".json,application/json"></label></div>
+        <div class="song-row"><input id="lib-url" type="url" placeholder="or a web address of a file (Dropbox, GitHub, a website)" aria-label="Web address of a library or set file"><button id="lib-open-url">Open</button></div>
+        <div class="actions"><button id="lib-save">Save my whole library to a file</button></div>
+        <p id="lib-status" class="song-status"></p>
+
+        <details class="song-own">
+          <summary>Collect songbooks from churchofjesuschrist.org</summary>
+          <p>For your own home use: the <a id="collect-bookmark" class="bookmarklet" href="#hymns">Sing</a> bookmark (see
+            "Hymns from churchofjesuschrist.org" below to add it) reads whole songbooks (Hymns for Home and Church,
+            Hymns, Children's Songbook) into your library, with every part, verse, topic, and voicing. Verses printed
+            below the music are fitted to the notes by AI when this app's local helper is running.</p>
+          <p><b>Use it:</b> open any page on churchofjesuschrist.org other than a song, and tap the bookmark. Pick the
+            songbooks. To get only new or changed songs, pick your saved library file; it can also refresh the topics
+            and voicing of the songs you have, which takes a few seconds per book. Reading songs takes a couple of
+            seconds each (all three books about 30 minutes), then it opens this app, or saves a file to open here if
+            it's large.</p>
+          <p class="hint">Each song keeps the data it was collected with, so newer versions of this app rebuild your
+            songs without collecting them again.</p>
+        </details>
+      </details>
+      <div class="song-row">
+        <span>Key:</span>
+        <button id="song-lower" aria-label="Lower key">Lower</button>
+        <b id="song-key" class="key-name"></b>
+        <button id="song-higher" aria-label="Higher key">Higher</button>
+        <button id="song-fit">Fit to my range</button>
+        <label>Speed <select id="song-speed">
+          <option value="0.5">Half speed</option>
+          <option value="0.75">75%</option>
+          <option value="0.9">90%</option>
+          <option value="1" selected>Normal</option>
+        </select></label>
+      </div>
+      <label class="hint check"><input type="checkbox" id="song-keep"> Keep the written key: move only by a whole
+        octave, up or down. On for hymns, so practice matches singing with the congregation (an octave lower or higher is
+        the same key; men often sing the melody an octave lower).</label>
+      <div class="song-row">
+        <span>My comfortable range:</span>
+        <select id="song-range-low" aria-label="Lowest comfortable note"></select>
+        <span>to</span>
+        <select id="song-range-high" aria-label="Highest comfortable note"></select>
+        <span id="song-range-from" class="hint"></span>
+      </div>
+      <p class="hint">The notes you can sing easily; songs are moved to fit inside them. Not sure? The range test
+        above finds them in about 3 minutes. As a rough start, many men are comfortable around C3 to C4
+        (131-262 Hz) and many women around A3 to A4 (220-440 Hz). One octave is 12 steps.</p>
+      <label class="hint check"><input type="checkbox" id="song-click"> Click the beat while I sing</label>
+      <div class="song-row">
+        <label>While I sing, play <select id="song-play">
+          <option value="others">Everyone but me</option>
+          <option value="all">All parts</option>
+          <option value="mine">Only my part</option>
+          <option value="none">Nothing (just the click)</option>
+        </select></label>
+      </div>
+      <p class="hint">For songs with several parts (soprano, alto, tenor, bass). "Everyone but me" plays the
+        other parts and leaves a gap for yours, like singing in a choir. Learn a part with "All parts" or
+        "Only my part" first. If your own part plays out loud, wear headphones, or the mic hears it and
+        scores it as you. Listen first always plays every part.</p>
+
+      <div class="lane-wrap"><canvas id="song-lane" aria-label="The song's notes over time, with your voice drawn over them"></canvas></div>
+      <div class="legend">
+        <span><i class="sw comfy"></i>On pitch</span>
+        <span><i class="sw reach"></i>Off pitch (sharp = too high, flat = too low)</span>
+        <span><i class="sw missed"></i>Not heard</span>
+        <span><i class="sw bracket"></i>Line above a note: from the beat to when you came in (early or late)</span>
+      </div>
+      <p id="song-status" class="song-status"></p>
+      <div class="actions">
+        <button id="song-sing" class="primary">Sing it</button>
+        <button id="song-listen">Listen first</button>
+        <button id="song-stop" hidden>Stop</button>
+        <button id="song-done">Done</button>
+      </div>
+      <p id="song-note" class="song-note"></p>
+
+      <div id="song-result" hidden>
+        <h3>How it went</h3>
+        <div id="song-summary"></div>
+        <div class="actions">
+          <button id="song-again" class="primary">Sing it again</button>
+          <button id="song-copy-ai">Copy for any AI app</button>
+        </div>
+        <p class="hint">Copies this take, note by note, with a question for a coach. Paste it into any AI chat
+          for tips on what to practice.</p>
+      </div>
+
+      <details class="song-own">
+        <summary>Use your own song</summary>
+        <p>Load a MIDI file (.mid), for example one exported from MuseScore or a song-writing app. Each track
+          becomes a part you can pick under "My part" (the top note where a part plays chords).</p>
+        <input type="file" id="song-file" accept=".mid,.midi,audio/midi,audio/x-midi">
+        <p>Or type a melody. Notes are a letter and an octave number (C4 is middle C, 261.6 Hz); each lasts
+          one beat unless you add a length, like <code>G4:2</code> for two beats or <code>E4:0.5</code> for
+          half a beat. <code>r</code> is a rest (silence). <code>|</code> marks a bar and is optional. Words
+          go one syllable per note; <code>_</code> holds a syllable over an extra note. Any AI chat can write
+          a melody in this format if you paste in this example.</p>
+        <textarea id="song-text" rows="7" spellcheck="false">title: My song
+tempo: 90
+time: 4/4
+notes: C4 D4 E4:2 | E4 F4 G4:2 | G4 E4 D4 C4 | D4:4
+words: here is my song, I made it up, sing it with me now</textarea>
+        <div class="actions"><button id="song-load">Use this melody</button></div>
+        <p id="song-error" class="error" hidden></p>
+      </details>
+
+      <details class="song-own" id="hymns">
+        <summary>Hymns from churchofjesuschrist.org</summary>
+        <p>Songs from the hymnbooks and the Children's Songbook can be practiced here with every part and verse:
+          add one bookmark, then tap it on the Church site.</p>
+        <p><b>On a computer:</b> drag this button to your bookmarks bar:
+          <a id="hymn-bookmark" class="bookmarklet" href="#hymns">Sing</a></p>
+        <p><b>On a phone:</b> tap <button id="hymn-copy">Copy the bookmark</button>, bookmark any page, edit that
+          bookmark, name it <b>Sing</b>, and paste the copied text as its address (URL).</p>
+        <p><b>On a song's page,</b> tap the bookmark (on Android Chrome, type "Sing" in the address bar and tap the
+          bookmark) and this app opens with that song; pick your part and verse. Songs without Interactive Sheet
+          Music can't be sent. <b>On any other page of the site,</b> it opens the songbook collector (see the
+          library above).</p>
+        <p class="hint">The hymn goes straight from the Church's page to this app in your browser; this site never
+          stores it. The arrangements are copyright Intellectual Reserve, Inc. and may be copied for incidental,
+          noncommercial Church or home use, so keep shared links to that. If the Church changes its website,
+          the bookmark may stop working until this app is updated.</p>
+      </details>
+
+      <details class="hint">
+        <summary>Timing looks off? Measure the delay</summary>
+        <p>Speakers, headphones, and mics all add a small delay, which can make every note look late.
+          <b>Measure it</b> plays a short melody out loud and listens to it through the mic, the way it
+          listens to you, then sets the adjustment so it scores on time. Take headphones off, turn the volume
+          up, and stay quiet while it runs (about 12 seconds). Measuring again should then read close to 0 ms;
+          readings within about 25 ms of each other are as close as it can tell.</p>
+        <p>The measurement covers this speaker. Wired headphones use the same timing; Bluetooth headphones add
+          their own delay (often 150-250 ms more), which the mic can't hear, so nudge it with Later.
+          If notes still show late when you're sure you're on the beat, press Later; if early, press Earlier.</p>
+        <div class="actions">
+          <button id="song-calibrate">Measure it</button>
+          <button id="song-sync-down">Earlier</button>
+          <span id="song-sync" class="sync-value"></span>
+          <button id="song-sync-up">Later</button>
+        </div>
+        <p id="song-sync-note" class="hint"></p>
+        <p id="song-cal-result" class="song-note"></p>
+      </details>
+    </section>
+
     <section id="results" class="card" hidden>
       <h2>Your range</h2>
       <div id="summary"></div>
@@ -105,6 +298,7 @@
         <button id="export">Download results (JSON)</button>
         <button id="retest">Test again</button>
         <button class="practice-open">Practice matching notes</button>
+        <button class="song-open">Practice a song</button>
         <button id="ask-ai" hidden>Ask AI to explain my results</button>
       </div>
       <div id="ai-output" class="ai-output" hidden></div>

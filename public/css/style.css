@@ -191,3 +191,42 @@ body.testing #actions:empty { display: none; }
 }
 
 footer a { color: var(--accent); }
+
+/* Song practice: a sideways-scrolling picture of the notes, with the voice drawn over them. */
+body.singing #trace,
+body.singing .extremes,
+body.singing #step-hint { display: none; }
+.song-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.song-row select { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); max-width: 100%; }
+.lane-wrap { overflow-x: auto; margin-top: 12px; border-radius: 8px; background: var(--bg); }
+#song-lane { display: block; height: 260px; width: 100%; cursor: pointer; }
+body.song-live .lane-wrap { overflow-x: hidden; }
+.song-status { min-height: 1.5em; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+.song-note { min-height: 1.5em; }
+.sw.missed { border: 2px dashed var(--home); }
+.sw.bracket { height: 3px; border-radius: 0; background: var(--warn); vertical-align: 3px; }
+.song-own textarea { width: 100%; font: 0.9rem/1.4 ui-monospace, Consolas, monospace; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.song-own, #song details { margin-top: 12px; }
+#song details summary { cursor: pointer; }
+.bookmarklet { display: inline-block; padding: 6px 12px; border-radius: 8px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; cursor: grab; }
+.lib-results { list-style: none; padding: 0; margin: 4px 0; max-height: 360px; overflow: auto; }
+.lib-results li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.lib-results .lib-pick { flex: 1 1 14em; text-align: left; padding: 6px 10px; }
+.lib-results small, .set-list small { color: var(--muted); }
+.lib-results .lib-add, .set-list button { padding: 4px 10px; font-size: 0.85rem; }
+.fit { font-size: 0.8rem; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.fit.good { color: var(--comfy); border-color: var(--comfy); }
+.fit.ok { color: var(--reach); border-color: var(--reach); }
+.fit.poor { color: var(--home); border-color: var(--home); }
+.set-box { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+.set-box h3 { margin: 0 0 6px; }
+.set-box textarea, #lib-search, #lib-url, .set-song-note { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.set-box textarea { width: 100%; }
+#lib-search, #lib-url { flex: 1 1 14em; }
+.set-list li { margin: 6px 0; }
+.set-song-note { width: 100%; margin: 4px 0; }
+.key-name { min-width: 4ch; text-align: center; font-variant-numeric: tabular-nums; }
+.sync-value { min-width: 6ch; text-align: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  #song-lane { height: 200px; }
+}

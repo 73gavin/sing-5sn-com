@@ -1,2 +1,4 @@
 node_modules/
 bridge/certs/
+# Your own files the local helper shares with your devices (a song library): never published.
+local/

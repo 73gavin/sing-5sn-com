@@ -54,6 +54,12 @@ Synthetic voice-like tones from C2 to F#6 must be detected within 10 cents.
 | `public/js/notes.js` | Hz / MIDI / note-name math, voice-type label |
 | `public/js/audio.js` | Mic input (browser voice processing off), reference tones |
 | `public/js/app.js` | Test flow, live display, results, history (localStorage) |
+| `public/js/song.js` | Song text format, MIDI import, per-note pitch and timing scoring (no DOM, tested) |
+| `public/js/songs.js` | Built-in public domain practice melodies |
+| `public/js/sing.js` | Song practice page: count-in, scrolling note picture, take review |
+| `public/js/hymn.js` | The "Sing" bookmark for churchofjesuschrist.org (one song, or whole songbooks), and the converter |
+| `public/js/library.js` | Library of collections (IndexedDB), search, set and library files, verse fitting |
+| `public/js/popularity.js` | The 50 most-sung hymns (SingPraises.net survey), for the "Most sung" filter |
 | `public/js/ai.js` | Optional client for the AI bridge |
 | `bridge/` | Local server: static files + pluggable AI |
 
@@ -81,6 +87,115 @@ so the peak-normalized wave stays loud. Laptop and phone speakers play little be
 200-300 Hz; on a laptop's own speaker-to-mic path this raised A1 (55 Hz) from -48 to
 -28 dBFS and took detection from 0 to 16 of 16 frames. Turn it off for headphones or
 full-range speakers if you prefer the plain tone.
+
+Song practice: pick a built-in melody, type one, or load a MIDI file, and sing along after a
+count-in. The notes scroll past a "now" line as bars (height = pitch, length = duration) and the
+voice draws over them, green when within 50 cents of the note, amber when not. Each note is
+scored as it passes: on pitch / sharp / flat (octave slips are scored against the sung octave),
+and on time / early / late, from when the voice arrived on its pitch (on time = within about a
+third of the note, 0.12-0.25 s). The voice is cut into runs of steady pitch and each note is
+matched to the nearest-pitch run that overlaps it, so a singer who is consistently early or late
+is still scored on the right notes. A bracket above each note shows the beat-to-entry gap.
+"Fit to my range" moves the song into the latest comfortable range; speed goes down to half.
+Timing is corrected for the detector's own delay (a change of note shows about 75 ms later at
+4096 samples, measured on synthetic voices, plus half the ~50 ms between detections) and the
+output and input latency the browser reports. What's left (speaker and mic delays the browser
+doesn't report) starts at an estimated +90 ms, from a laptop and a phone with built-in speakers
+and mics, and is measured per device by "Measure it": the
+app plays a 16-note legato melody out loud (legato because the detector catches a change of
+note later than a note after silence, and songs are mostly changes), scores itself through the
+mic, and stores the median entry offset as the timing adjustment. Bluetooth headphones can't be measured that way (the mic
+can't hear them), so Earlier / Later nudge it by hand. The melody can play along (needs
+headphones, since the mic would hear it). "Copy for any AI app" copies the take note by note
+(`song-take/v1`, prompt in `report.js`).
+
+The address keeps the screen after "#", so a refresh, bookmark, or link to another device comes
+back to it: `#song=twinkle-twinkle-little-star&shift=-19&speed=0.75` (built-in songs by name; a
+typed or MIDI melody is deflate-compressed into `&melody=`), `#practice`, or
+`#results=<test date>`. A linked song doesn't ask for the mic until Sing it. The range test
+itself always starts from the beginning.
+
+Songs can have several parts and verses. The parts follow the voicing the Church site gives each
+song: SATB (Soprano, Alto, Tenor, Bass), men's choir TTBB / TTB (Tenor 1, Tenor 2, Baritone,
+Bass; tenors written in treble clef sound an octave lower), women's choir SSA / SA, and
+Two-Part. Unison songs and the Children's Songbook become a Melody (the top line of the staff
+with the words), a Descant if another staff has words, and Piano or Instrument parts that play
+along but aren't offered to sing. Without a voicing, two staves (treble then bass) are SATB. A part with words of its own (a bass line with different words, men answering the women)
+keeps them; other parts sing the melody's words. "My part" picks the part
+that is scored and drawn as bars (the others are drawn faint); "Words" picks the verse. While
+singing, the app plays the other parts by default ("Everyone but me": the other voices around
+you and a gap for yours, as in a choir, and your own notes can't reach the mic and be scored as
+you); "All parts", "Only my part", and "Nothing" are the other choices. A part without words of
+its own sings the words of the part that has them, on the notes that start together. The key is
+shown by name when known (`key:` line, a MIDI key signature, or the hymn's), as "Written in D,
+moved 2 steps lower to C".
+
+Keeping the key: a hymn practiced in another key would clash with the congregation, so hymns
+(`transpose: octaves`, set by the hymn import) move only by a whole octave, at most one either
+way (the same key; men often sing a melody an octave lower). "Lower / Higher" become "Octave
+down / up", and "Fit to my range" picks the octave. "Keep the written key" can be turned off for
+solo practice; the card then says "Not the hymnbook key: the congregation sings in D." When
+another part fits the singer's range better as written, the card suggests it instead.
+
+Hymns from churchofjesuschrist.org: the arrangements are copyright Intellectual Reserve, Inc.
+and may be copied for incidental, noncommercial Church or home use, and the site serves its
+files only to its own pages, so this app never fetches or stores them. Instead, a "Send to
+Sing" bookmark (made on the song card, for whichever address serves the app) runs on a song's
+page, reads the page's data and the score its Interactive Sheet Music view plays (MusicXML as
+JSON), plus the song's voicing from its book's filter list,
+keeps only pitches, lengths, voices, words, key, and tempo, and opens the app with that packed
+into `#import=`. `hymn.js` splits the treble and bass staves into four parts (chords in a
+staff's upper voice are two parts moving together; a lone upper note over silence is both in
+unison). The site's format is undocumented: if it changes, the extraction in `hymn.js`
+(`EXTRACT`) needs updating.
+
+Library: collections of songs (each songbook, songs sent with the bookmark, your own, and choir
+sets), kept in the browser (IndexedDB) and searchable by collection name, number, title, and
+words, with a mark for how much of your part fits your range. A choir director adds songs to a
+set (with a note for everyone and one per song) and saves it as a file to email or text, or puts
+it on Dropbox, GitHub, or a website; members open the file or its web address. Library files,
+set files, and collected-songs files share one format (`sing-library/v1`, see `library.js`).
+Google Drive links can't be opened: Drive doesn't let other web apps read its files.
+
+Fit marks and order: with a comfortable range set and nothing typed, the library lists best fits
+first. "Fit for: my part" measures your part as written (the share of its notes in your range);
+"Fit for: the melody" shows how many steps the tune, in the octave you'd sing it, must move from
+the hymnbook key to fit your range (0: you can sing it with the congregation), closest first.
+"Most sung" filters (top 10, 25, 50) use SingPraises.net's survey of 16,491 sacrament meetings
+(2017, Hymns 1985; `popularity.js`), and each of those songs shows its rank.
+
+Collecting songbooks (home use): on any other page of churchofjesuschrist.org the same "Sing"
+bookmark opens a panel that reads Hymns for Home and Church, Hymns (1985), and the Children's
+Songbook. Each book's song list gives numbers, dates, sections, topics, and people; its filter
+lists (one request per value, about a minute per book) give each song's voicing, difficulty,
+choir, category, and instruments, which become library filters. Songs are read one every
+couple of seconds, skipping songs already in a library file you pick unless the site's date for
+them changed; the songs you have can get their details refreshed in the same pass. Each song
+keeps its source link and credits, and the data it was collected with (about 3 KB compressed):
+when the reading rules change (`READER` in `hymn.js`), the app rebuilds stored songs from it,
+reusing verses AI already fitted, without collecting again.
+Verses printed below the music (the page lists every verse's words; the score has only some)
+are fitted to the notes by AI through the local bridge (`fit-verse` task, prompt in
+`report.js`); every answer must have one syllable per note and exactly the verse's words, or the
+verse is kept as words only. Refrains are found by the chorus's words and sung by every verse.
+Library files stay on your device; they are not part of this project.
+
+Text melody format (also what MIDI files are converted to, so they can be edited):
+
+```
+title: Twinkle, Twinkle, Little Star
+tempo: 100
+time: 4/4
+notes: C4 C4 G4 G4 | A4 A4 G4:2
+words: Twin- kle twin- kle lit- tle star,
+```
+
+Several parts and verses: start each part with `part: Bass`, and number later verses
+`words 2:`, `words 3:`. A `key: D` line names the written key, and `transpose: octaves`
+keeps it (moves by whole octaves only); a `time: 2/4` line between
+`notes:` lines changes the time signature from there.
+
+Notes last one beat unless given `:beats`; `r` is a rest; `_` in words holds a syllable.
 
 Results export as JSON (`schema: voice-range/v1`). Later phases consume this file.
 
@@ -126,8 +241,11 @@ reach local devices.
 3. **Profile interview + co-writer:** the AI proposes chords, a melody kept inside the
    singer's range, and lyric drafts; the human edits. Exports ChordPro, MusicXML, and
    MIDI, with an OpenUtau guide vocal.
-4. **Practice:** karaoke-style pitch overlay on your own songs, recorded takes.
+4. **Practice:** karaoke-style pitch and timing overlay on your own songs (started: song
+   practice), recorded takes.
 5. **Release:** backing tracks, stems, charts for a band.
+
+Smaller ideas and next steps are tracked in [IDEAS.md](IDEAS.md).
 
 ## License
 

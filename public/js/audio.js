@@ -14,6 +14,9 @@ export async function openMic() {
   return {
     ctx,
     sampleRate: ctx.sampleRate,
+    size: analyser.fftSize,
+    // Seconds from the mic to the page, where the browser reports it (Chrome does).
+    inputLatency: stream.getAudioTracks()[0]?.getSettings().latency || 0,
     read() {
       analyser.getFloatTimeDomainData(buf);
       return buf;
@@ -29,18 +32,46 @@ export async function openMic() {
 // cannot physically reproduce (the ear fills in the missing fundamental).
 // `bright` extends low notes' harmonics into the range small speakers can play; see toneHarmonics.
 export function playTone(ctx, hz, seconds = 1.2, bright = false) {
-  const now = ctx.currentTime;
+  const osc = scheduleTone(ctx, hz, ctx.currentTime, seconds, bright);
+  return new Promise((resolve) => (osc.onended = resolve));
+}
+
+// The same tone at an exact time on the audio clock, for playing a melody in time.
+// Returns the oscillator, so a stopped song can silence notes not yet played.
+// `level` is the note's loudness; parts sounding together each get less, so the sum doesn't clip.
+export function scheduleTone(ctx, hz, when, seconds, bright = false, dest = ctx.destination, level = 0.25) {
+  const attack = Math.min(0.04, seconds / 4), release = Math.min(0.15, seconds / 3);
   const out = ctx.createGain();
-  out.gain.setValueAtTime(0, now);
-  out.gain.linearRampToValueAtTime(0.25, now + 0.04);
-  out.gain.setValueAtTime(0.25, now + seconds - 0.15);
-  out.gain.linearRampToValueAtTime(0, now + seconds);
-  out.connect(ctx.destination);
+  out.gain.setValueAtTime(0, when);
+  out.gain.linearRampToValueAtTime(level, when + attack);
+  out.gain.setValueAtTime(level, when + seconds - release);
+  out.gain.linearRampToValueAtTime(0, when + seconds);
+  out.connect(dest);
 
   const osc = organ(ctx, hz, out, bright);
-  osc.start(now);
-  osc.stop(now + seconds);
-  return new Promise((resolve) => (osc.onended = resolve));
+  osc.start(when);
+  osc.stop(when + seconds);
+  return osc;
+}
+
+// A metronome click: 30 ms of band-passed noise. Noise has no pitch, so the detector
+// ignores clicks the mic picks up. Accented clicks (the first beat of a bar) are higher.
+export function scheduleClick(ctx, when, accent = false, dest = ctx.destination) {
+  const len = Math.round(ctx.sampleRate * 0.03);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const band = ctx.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = accent ? 3500 : 2200;
+  band.Q.value = 1.5;
+  const gain = ctx.createGain();
+  gain.gain.value = accent ? 1.6 : 1;
+  src.connect(band).connect(gain).connect(dest);
+  src.start(when);
+  return src;
 }
 
 // The same tone, sounding until the returned release() is called, like a held piano key.

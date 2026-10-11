@@ -3,6 +3,7 @@ import { noteInfo, midiToName, midiToFreq, freqToMidi, isBlackKey, guessVoiceTyp
 import { openMic, playTone, holdTone } from './audio.js';
 import { aiStatus, aiAsk } from './ai.js';
 import { accuracyOf, aiPrompt } from './report.js';
+import { initSong, openSong, closeSong, songTick, drawSong } from './sing.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -35,6 +36,7 @@ let lastTick = 0, clipUntil = 0, levelDb = -60, viewLo = 40, shownNote = null, i
 
 function tick(now) {
   requestAnimationFrame(tick);
+  if (singing) drawSong(); // the song picture scrolls every frame; detection stays at ~22 a second
   if (now - lastTick < 45) return; // ~22 detections per second is plenty
   lastTick = now;
 
@@ -60,6 +62,7 @@ function tick(now) {
     $('free-high').textContent = midiToName(free.high);
   }
 
+  if (singing) songTick(hz);
   if (speech && hz) speech.push(freqToMidi(hz));
   const gh = guideHold.feed(hz, now);
   if (pending && gh) {
@@ -69,7 +72,7 @@ function tick(now) {
       hint(offTargetHint(gh.exact, pending.target));
     }
   }
-  drawTrace(now, liveTarget);
+  if (!singing) drawTrace(now, liveTarget);
 }
 
 function offTargetHint(sung, target) {
@@ -526,6 +529,7 @@ const octaves = (st) => (st / 12).toFixed(1);
 
 function showResult(r) {
   current = r;
+  setHash(`results=${encodeURIComponent(r.date)}`);
   const rows = [];
   if (r.comfortable) rows.push(['Comfortable range', `<b>${fmt(r.comfortable.low)} to ${fmt(r.comfortable.high)}</b>, ${r.comfortable.semitones} semitones`]);
   rows.push(['Full range', `${fmt(r.full.low)} to ${fmt(r.full.high)}, ${r.full.semitones} semitones (${octaves(r.full.semitones)} octaves)`]);
@@ -661,6 +665,7 @@ const tally = { matched: 0, cents: 0 };
 
 async function startPractice() {
   if (running || !(await openInput())) return;
+  setHash('practice');
   if (!practicing) {
     // Start on the C at or below the most recent comfortable range (or starting note).
     const last = current || loadAll()[0];
@@ -769,6 +774,74 @@ $('practice-keys').addEventListener('pointerdown', (e) => {
 });
 for (const ev of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(ev, () => releaseKey());
 
+// ---------- song practice (sing.js) ----------
+
+let singing = false;
+
+// params: a song from the address. Then the mic waits until Sing it, instead of asking on load.
+async function startSong(params = null) {
+  if (running || (!params && !(await openInput()))) return;
+  stopPractice();
+  singing = true;
+  document.body.classList.add('singing');
+  for (const id of ['intro', 'results', 'step']) $(id).hidden = true;
+  await openSong(params);
+  $('song').scrollIntoView({ behavior: params ? 'auto' : 'smooth', block: 'start' });
+}
+
+initSong({
+  openInput,
+  mic: () => mic,
+  bright: () => brightLows,
+  mute: (until) => (muteUntil = until),
+  copy: copyText,
+  // The most recent comfortable range, for fitting songs to the voice.
+  lastRange() {
+    const c = (current || loadAll()[0])?.comfortable;
+    return c ? { low: c.low.midi, high: c.high.midi } : null;
+  },
+  close() {
+    setHash('');
+    singing = false;
+    document.body.classList.remove('singing');
+    if (current) $('results').hidden = false;
+    else $('intro').hidden = false;
+  },
+});
+
+// ---------- the screen in the address ----------
+//
+// #song=...  a song in song practice (sing.js keeps its key and speed up to date)
+// #practice  note-matching practice
+// #results=<date>  a saved test result
+// A refresh or a bookmark comes back to the same screen. The range test itself always
+// starts from the beginning.
+
+function setHash(h) {
+  history.replaceState(null, '', `${location.pathname}${location.search}${h ? `#${h}` : ''}`);
+}
+
+function route() {
+  if (running) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  // Leave the screen that's open (the address can change while the page is open).
+  if (practicing && !p.has('practice')) stopPractice();
+  const songLink = ['song', 'import', 'collected', 'open'].some((k) => p.has(k));
+  if (singing && !songLink) closeSong();
+  if (songLink) return startSong(p);
+  if (p.has('practice')) return startPractice();
+  const all = loadAll();
+  const r = p.has('results') && (all.find((x) => x.date === p.get('results')) || all[0]);
+  if (r) {
+    $('intro').hidden = true;
+    showResult(r);
+  } else {
+    setHash('');
+    $('results').hidden = true;
+    $('intro').hidden = false;
+  }
+}
+
 // ---------- history ----------
 
 const loadAll = () => JSON.parse(localStorage.getItem(STORE) || '[]');
@@ -861,12 +934,19 @@ async function openInput() {
     return false;
   }
   detect = createDetector({ sampleRate: mic.sampleRate });
+  // Opened from a link on page load, the audio starts paused until the first tap or key.
+  if (mic.ctx.state === 'suspended') {
+    const wake = () => mic.ctx.resume();
+    document.addEventListener('pointerdown', wake, { once: true });
+    document.addEventListener('keydown', wake, { once: true });
+  }
   $('live').hidden = false;
   requestAnimationFrame(tick);
   return true;
 }
 
 async function start() {
+  setHash('');
   if (running || !(await openInput())) return;
   stopPractice();
   $('intro').hidden = true;
@@ -876,6 +956,7 @@ async function start() {
 $('start').onclick = start;
 $('retest').onclick = start;
 for (const b of document.querySelectorAll('.practice-open')) b.onclick = startPractice;
+for (const b of document.querySelectorAll('.song-open')) b.onclick = startSong;
 // The same setting appears on the intro and practice cards; keep both boxes in step.
 const brightBoxes = document.querySelectorAll('.bright-lows');
 for (const box of brightBoxes) {
@@ -890,6 +971,7 @@ $('oct-down').onclick = () => shiftOctave(-12);
 $('oct-up').onclick = () => shiftOctave(12);
 $('practice-done').onclick = () => {
   stopPractice();
+  setHash(current ? `results=${encodeURIComponent(current.date)}` : '');
   if (current) $('results').hidden = false;
   else $('intro').hidden = false;
 };
@@ -903,4 +985,6 @@ if (navigator.share) {
   $('share-ai').onclick = () => shareForAi([current]);
 }
 renderHistory();
+route();
+window.addEventListener('hashchange', route);
 aiStatus().then((s) => ($('ask-ai').hidden = !s?.ok));

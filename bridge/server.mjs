@@ -7,6 +7,9 @@
 //
 // GET  /api/health  -> { ok, provider, model, tasks }
 // POST /api/ai      { task, input } -> { text, provider, model }
+// GET  /api/local/<file>  -> a file from local/ (your own song library, say), for your other
+//                            devices; local/ is outside public/ and not in git, so it is never
+//                            published
 //
 // In LAN mode, API calls from other devices must send the pairing key (x-bridge-key);
 // the printed URL carries it once (?key=...) and the page remembers it.
@@ -24,6 +27,7 @@ import { lanAddresses, loadCert, pairingKey } from './lan.mjs';
 const PORT = Number(process.env.PORT || 8787);
 const LAN = process.argv.includes('--lan') || ['1', 'true', 'yes'].includes((process.env.LAN || '').toLowerCase());
 const ROOT = resolve(fileURLToPath(new URL('../public', import.meta.url)));
+const LOCAL = resolve(fileURLToPath(new URL('../local', import.meta.url)));
 const EXTRA_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const MAX_BODY = 64 * 1024;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -102,6 +106,18 @@ async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   if (url.pathname.startsWith('/api/') && !keyOk(req)) {
     return send(res, 401, { error: 'pairing key missing or wrong; open the URL the server printed' }, cors);
+  }
+
+  if (url.pathname.startsWith('/api/local/') && req.method === 'GET') {
+    const name = decodeURIComponent(url.pathname.slice('/api/local/'.length));
+    const file = normalize(join(LOCAL, name));
+    if (!file.startsWith(LOCAL + sep) || name.includes('/')) return send(res, 403, { error: 'forbidden' }, cors);
+    try {
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...cors });
+      return res.end(await readFile(file));
+    } catch {
+      return send(res, 404, { error: 'not found' }, cors);
+    }
   }
 
   if (url.pathname === '/api/health') {

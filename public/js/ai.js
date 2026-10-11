@@ -1,6 +1,6 @@
 // Client for the optional local AI bridge (bridge/server.mjs). The app works without it.
 //
-// Served by the bridge on this PC (http://localhost:8787) it just works. On a phone in
+// Served by the bridge on this PC (http://localhost, any port) it just works. On a phone in
 // LAN mode, the URL the server prints carries ?key=..., which is remembered here and
 // sent with every call. From any other origin it stays silent unless opted in once with
 // ?ai=http://127.0.0.1:8787, because probing localhost from a public site makes browsers
@@ -21,7 +21,7 @@ if (params.get('key')) {
 
 const pairKey = localStorage.getItem(PAIR_KEY);
 const base = localStorage.getItem(BASE_KEY)
-  ?? (local ? (location.port === '8787' ? '' : 'http://127.0.0.1:8787') : pairKey ? '' : null);
+  ?? (local || pairKey ? '' : null); // a page the bridge serves has the API on its own address
 const auth = pairKey ? { 'x-bridge-key': pairKey } : {};
 
 export async function aiStatus() {
@@ -32,6 +32,15 @@ export async function aiStatus() {
   } catch {
     return null;
   }
+}
+
+// A file from the bridge's local/ folder (your own library, shared with your phone), sent
+// with the pairing key like any bridge call.
+export async function bridgeFile(path) {
+  if (base == null) throw new Error('This page is not connected to the local helper.');
+  const r = await fetch(base + path, { headers: auth });
+  if (!r.ok) throw new Error(`The helper answered ${r.status} ${r.statusText}.`);
+  return r.json();
 }
 
 export async function aiAsk(task, input) {
