@@ -131,7 +131,16 @@
           <p class="hint">Email or text the file, or put it on Dropbox or a website and share the link. Members open it below.</p>
         </div>
 
+        <div id="lib-offer" class="set-box" hidden>
+          <p id="lib-offer-text"></p>
+          <div class="actions"><button id="lib-offer-open" class="primary">Open</button><button id="lib-offer-cancel">Cancel</button></div>
+        </div>
         <h3>Open or save</h3>
+        <div id="lib-source" hidden>
+          <div class="actions"><button id="lib-update">Update</button><button id="lib-setup">Copy a setup link for another device</button></div>
+          <p class="hint">The setup link opens this library and sets your range and part on a new phone or browser in
+            one tap. It holds the library's private address: keep it to your own devices.</p>
+        </div>
         <div class="song-row"><label>Open a file <input type="file" id="lib-file" accept=".json,application/json"></label></div>
         <div class="song-row"><input id="lib-url" type="url" placeholder="or a web address of a file (Dropbox, GitHub, a website)" aria-label="Web address of a library or set file"><button id="lib-open-url">Open</button></div>
         <div class="actions"><button id="lib-save">Save my whole library to a file</button></div>

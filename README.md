@@ -157,6 +157,14 @@ it on Dropbox, GitHub, or a website; members open the file or its web address. L
 set files, and collected-songs files share one format (`sing-library/v1`, see `library.js`).
 Google Drive links can't be opened: Drive doesn't let other web apps read its files.
 
+Setup links: `#open=<https address of a library file>&range=C#2-F#3&mypart=Bass&fit=part` fetches
+the library, asks before opening it, applies the range, part, and fit settings, and remembers the
+address for "Update". "Copy a setup link for another device" builds one from the current
+settings. The file's host must allow other sites to read it (an `Access-Control-Allow-Origin`
+header); an unlisted address is the only privacy, so keep such links to your own devices. The
+local bridge can also share a file from `local/` (not in git) with your devices:
+`/api/local/<file>` (pairing key in a header, or `?key=` with `&download=1` to save it).
+
 Fit marks and order: with a comfortable range set and nothing typed, the library lists best fits
 first. "Fit for: my part" measures your part as written (the share of its notes in your range);
 "Fit for: the melody" shows how many steps the tune, in the octave you'd sing it, must move from

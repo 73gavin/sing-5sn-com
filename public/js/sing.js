@@ -2,7 +2,7 @@
 // whether you were on pitch and on time. The notes scroll past a "now" line like a piano roll;
 // your voice draws over them. Scoring lives in song.js; this file is the page.
 
-import { parseSong, parseMidi, songToText, songRange, fitShift, insideShare, timeline, scoreNote, summarizeTake, PITCH_OK, barStarts, pickupBeats, barNumber, practiceView, keyName, isAccompaniment } from './song.js';
+import { parseSong, parseMidi, songToText, songRange, fitShift, insideShare, timeline, scoreNote, summarizeTake, PITCH_OK, barStarts, pickupBeats, barNumber, practiceView, keyName, isAccompaniment, nameToMidi } from './song.js';
 import { SONGS } from './songs.js';
 import { midiToName, midiToFreq, freqToMidi, isBlackKey } from './notes.js';
 import { scheduleTone, scheduleClick } from './audio.js';
@@ -227,14 +227,19 @@ async function updateHash() {
 // Opens the song named in the address, at its key and speed. Returns false if it can't.
 async function restore(p) {
   if (p.has('open')) {
-    // A library or set file the local helper shares (#open=/api/local/<file>), e.g. your
-    // library on your phone. Only the helper's own files, never another site's.
+    // A setup link: a library or set file, from the local helper (#open=/api/local/<file>) or a
+    // web address (#open=https://...), plus your settings (range=C#2-F#3&mypart=Bass&fit=part).
+    // A web address is fetched, then opened only when you confirm; the helper's own files open
+    // straight away.
     const path = p.get('open');
+    const settings = linkSettings(p);
     history.replaceState(null, '', `${location.pathname}${location.search}`);
     $('library').open = true;
     if (/^\/api\/local\/[^/]+$/.test(path)) {
       libStatus('Opening the library from the helper...');
-      try { await openContents(await bridgeFile(path)); } catch (e) { libStatus(`Couldn't open it: ${e.message}`); }
+      try { await openContents(await bridgeFile(path)); applySettings(settings); } catch (e) { libStatus(`Couldn't open it: ${e.message}`); }
+    } else if (/^https:\/\/[^/\s]+\/\S+$/.test(path)) {
+      await offerOpen(path, settings);
     }
     $('library').scrollIntoView({ behavior: 'smooth' });
     if (!song) pick();
@@ -1152,6 +1157,83 @@ async function addCollected(collected) {
   libStatus(`Added ${added} songs${details ? `, updated the details of ${details}` : ''}.${partly ? ` ${partly} have a verse that couldn't be fitted to the notes (shown as words only).` : ''}${failed ? ` ${failed} couldn't be read (no sheet music).` : ''}`);
 }
 
+// ---------- setup links: a library at a web address, and your settings ----------
+
+const SOURCE = 'voiceRange.librarySource'; // the web address the library was opened from
+
+// Settings carried in a setup link: range=C#2-F#3, mypart=Bass, fit=part|melody.
+function linkSettings(p) {
+  const out = {};
+  const r = /^([A-G][#b]?-?\d)-([A-G][#b]?-?\d)$/.exec(p.get('range') || '');
+  if (r) {
+    const low = nameToMidi(r[1]), high = nameToMidi(r[2]);
+    if (low != null && high != null && low < high) out.range = { low, high };
+  }
+  if (/^[\w ()-]{1,30}$/.test(p.get('mypart') || '')) out.partName = p.get('mypart');
+  if (['part', 'melody'].includes(p.get('fit'))) out.fitFor = p.get('fit');
+  return out;
+}
+
+function settingsText(s) {
+  return [s.range && `your comfortable range to ${midiToName(s.range.low)}-${midiToName(s.range.high)}`, s.partName && `your part to ${s.partName}`,
+    s.fitFor && `fit for ${s.fitFor === 'melody' ? 'the melody' : 'your part'}`].filter(Boolean).join(', ');
+}
+
+function applySettings(s) {
+  if (!Object.keys(s).length) return;
+  Object.assign(prefs, s);
+  savePrefs();
+  showRangePickers();
+  $('lib-fit').value = prefs.fitFor;
+  if (song) showInfo();
+  showResults();
+}
+
+// Fetches a library from a web address and asks before adding it (a link alone can't fill your
+// library); the address is remembered for "Update".
+async function offerOpen(url, settings = {}) {
+  const host = new URL(url).host;
+  libStatus(`Reading the library at ${host}...`);
+  let json;
+  try {
+    json = await lib.fetchFile(url);
+    lib.readFile(json); // a library, set, or collected file, or this throws
+  } catch (e) {
+    libStatus(`Couldn't read the library at ${host}: ${e.message}`);
+    return;
+  }
+  const n = (json.collections || []).reduce((a, c) => a + c.songs.length, 0) || (json.books || []).reduce((a, b) => a + b.songs.length, 0);
+  const also = settingsText(settings);
+  libStatus('');
+  $('lib-offer-text').textContent = `Open the song library from ${host}: ${n} songs${also ? `, and set ${also}` : ''}? Songs already in this browser are kept.`;
+  $('lib-offer').hidden = false;
+  $('lib-offer-open').onclick = async () => {
+    $('lib-offer').hidden = true;
+    await openContents(json);
+    localStorage.setItem(SOURCE, url);
+    applySettings(settings);
+    showSource();
+  };
+  $('lib-offer-cancel').onclick = () => { $('lib-offer').hidden = true; libStatus('Not opened.'); };
+}
+
+function showSource() {
+  const src = localStorage.getItem(SOURCE);
+  $('lib-source').hidden = !src;
+  if (src) $('lib-update').textContent = `Update from ${new URL(src).host}`;
+}
+
+// A link that sets up another device: this library's web address and your settings. It holds the
+// library's private address, so it's for your own devices only.
+function setupLink() {
+  const src = localStorage.getItem(SOURCE);
+  const p = new URLSearchParams({ open: src });
+  if (prefs.range) p.set('range', `${midiToName(prefs.range.low)}-${midiToName(prefs.range.high)}`);
+  if (prefs.partName) p.set('mypart', prefs.partName);
+  p.set('fit', prefs.fitFor || 'part');
+  return `${location.origin}${location.pathname}#${p}`;
+}
+
 function initLibrary() {
   $('lib-search').oninput = showResults;
   $('lib-topic').onchange = showResults;
@@ -1172,6 +1254,18 @@ function initLibrary() {
     libStatus('Opening...');
     try { await openContents(url.startsWith('/api/') ? await bridgeFile(url) : await lib.fetchFile(url)); } catch (err) { libStatus(err.message); }
   };
+  $('lib-update').onclick = async () => {
+    const src = localStorage.getItem(SOURCE);
+    libStatus(`Updating from ${new URL(src).host}...`);
+    try { await openContents(await lib.fetchFile(src)); } catch (e) { libStatus(`Couldn't update: ${e.message}`); }
+  };
+  $('lib-setup').onclick = async (e) => {
+    await env.copy(setupLink());
+    const btn = e.currentTarget, was = btn.textContent;
+    btn.textContent = 'Copied. Open it on your other device.';
+    setTimeout(() => (btn.textContent = was), 3000);
+  };
+  showSource();
   $('lib-save').onclick = async () => download(`sing-library-${new Date().toISOString().slice(0, 10)}.json`, lib.libraryFile(await lib.loadAll()));
   $('lib-delete').onclick = async () => {
     const c = collections.find((x) => x.id === $('lib-coll').value);

@@ -9,7 +9,8 @@
 // POST /api/ai      { task, input } -> { text, provider, model }
 // GET  /api/local/<file>  -> a file from local/ (your own song library, say), for your other
 //                            devices; local/ is outside public/ and not in git, so it is never
-//                            published
+//                            published. ?download=1 saves it as a file; ?key= carries the
+//                            pairing key in a plain link.
 //
 // In LAN mode, API calls from other devices must send the pairing key (x-bridge-key);
 // the printed URL carries it once (?key=...) and the page remembers it.
@@ -42,9 +43,13 @@ const isLoopback = (host) => ['localhost', '127.0.0.1', '[::1]'].includes(hostna
 const isOurs = (host) => isLoopback(host) || ips.includes(hostname(host));
 const fromLoopback = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 
+// The pairing key comes in the x-bridge-key header; a plain link to a shared file (a download
+// on a phone) can't send headers, so for GET /api/local/ it may come as ?key= instead.
 function keyOk(req) {
   if (!LAN || fromLoopback(req)) return true;
-  const got = Buffer.from(String(req.headers['x-bridge-key'] || ''));
+  const url = new URL(req.url, 'http://x');
+  const inLink = req.method === 'GET' && url.pathname.startsWith('/api/local/') ? url.searchParams.get('key') : null;
+  const got = Buffer.from(String(req.headers['x-bridge-key'] || inLink || ''));
   const want = Buffer.from(KEY);
   return got.length === want.length && timingSafeEqual(got, want);
 }
@@ -113,7 +118,8 @@ async function handle(req, res) {
     const file = normalize(join(LOCAL, name));
     if (!file.startsWith(LOCAL + sep) || name.includes('/')) return send(res, 403, { error: 'forbidden' }, cors);
     try {
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...cors });
+      const save = url.searchParams.get('download') ? { 'content-disposition': `attachment; filename="${name.replace(/[^\w.-]/g, '_')}"` } : {};
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...save, ...cors });
       return res.end(await readFile(file));
     } catch {
       return send(res, 404, { error: 'not found' }, cors);
