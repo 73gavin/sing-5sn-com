@@ -5,7 +5,8 @@ Open source (AGPL-3.0-or-later) web app for beginner singers, live at https://si
 `README.md` has run commands, file roles, test flow, AI provider table, and roadmap.
 
 ## Never
-- Commit or push unless asked: every push to `main` deploys to the live site.
+- Push work that is not ready to be live: every push to `main` deploys to the live site.
+  Commit as you go (workspace rule), and push once the change is finished and tested.
 - Add a build step or npm package to `public/`: it deploys as-is to Cloudflare Pages
   (static, ES modules, no dependencies).
 - Put prompt text in the browser. Wording lives in `public/js/report.js`, shared by
